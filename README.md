@@ -8,7 +8,7 @@
 |----------|------|----------|
 | JumpMod | 让你的角色跳得更高、更自由，自定义跳跃键和跳跃高度 | Mod Config（推荐） |
 | Lootbox Item Display | 显示地面掉落物、附近箱子内容以及全图最高价值物品的UI增强 | Mod Config（推荐） |
-| 讽刺性反作弊系统 (Satire Anti-Cheat System) | 模拟反作弊扫描，幽默娱乐，完全无害 | 无 |
+| Satire Anti-Cheat System | 模拟反作弊扫描，幽默娱乐，完全无害 | 无 |
 | System Info Display | 显示系统信息、网络信息和磁盘扫描结果 | 无 |
 
 
