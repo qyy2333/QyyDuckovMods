@@ -23,7 +23,6 @@ namespace JumpMod
         {
             Debug.Log("[JumpMod] Mod 已加载，等待角色初始化...");
 
-            // 如果 ModConfig 已可用，立即注册配置
             if (ModConfigAPI.IsAvailable())
             {
                 SetupModConfig();
