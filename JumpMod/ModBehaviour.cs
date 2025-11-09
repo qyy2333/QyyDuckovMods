@@ -10,35 +10,29 @@ namespace JumpMod
         private Movement movement;
         private CharacterMainControl player;
 
-        private bool jumpRequested = false;
+        private bool jumpRequested;
+        private float lastJumpTime;
+        private const float JumpCooldown = 0.1f;
 
-        private KeyCode jumpKey = KeyCode.Space; // 默认跳跃键
-        private float jumpForce = 5f;            // 默认跳跃高度
+        private string jumpKeyString = "Space";
+        private float jumpForce = 5f;
+        private float gravityMultiplier = 1f;
 
-        private string modName = "JumpMod";
-        private string keyConfig = "jumpKey";
-        private string forceConfig = "jumpForce";
+        private Vector3 originalGravity;
+        private bool gravityInitialized = false;
+
+        private const string ModName = "JumpMod";
+        private const string KeyConfig = "jumpKey";
+        private const string ForceConfig = "jumpForce";
+        private const string GravityConfig = "gravityMultiplier";
 
         protected override void OnAfterSetup()
         {
-            Debug.Log("[JumpMod] Mod 已加载，等待角色初始化...");
-
-            if (ModConfigAPI.IsAvailable())
-            {
-                SetupModConfig();
-            }
-
-            // 添加 Mod 激活事件监听
+            Debug.Log("[JumpMod] 已加载，等待 ModConfig...");
             ModManager.OnModActivated += OnModActivated;
-        }
 
-        private void OnEnable()
-        {
-            // 同 OnAfterSetup 保证激活时也处理
             if (ModConfigAPI.IsAvailable())
-            {
                 SetupModConfig();
-            }
         }
 
         private void OnDisable()
@@ -47,87 +41,75 @@ namespace JumpMod
             ModConfigAPI.SafeRemoveOnOptionsChangedDelegate(OnConfigChanged);
         }
 
-        /// <summary>
-        /// 在 ModConfig 可用时注册配置和监听事件
-        /// </summary>
+        private void OnModActivated(ModInfo info, Duckov.Modding.ModBehaviour behaviour)
+        {
+            if (info.name == ModConfigAPI.ModConfigName)
+            {
+                Debug.Log("[JumpMod] 检测到 ModConfig 已激活");
+                SetupModConfig();
+            }
+        }
+
         private void SetupModConfig()
         {
-            RegisterModConfig();
-            LoadConfigFromModConfig();
+            // 注册配置项
+            ModConfigAPI.SafeAddInputWithSlider(ModName, KeyConfig, "跳跃键", typeof(string), "Space");
+            ModConfigAPI.SafeAddInputWithSlider(ModName, ForceConfig, "跳跃高度", typeof(float), 5f, new Vector2(1f, 20f));
+            ModConfigAPI.SafeAddInputWithSlider(ModName, GravityConfig, "重力倍数", typeof(float), 1f, new Vector2(0.1f, 3f));
+
+            LoadConfig();
             ModConfigAPI.SafeAddOnOptionsChangedDelegate(OnConfigChanged);
         }
 
-        /// <summary>
-        /// 注册 ModConfig 配置项
-        /// </summary>
-        private void RegisterModConfig()
+        private void LoadConfig()
         {
-            // 跳跃键配置
-            ModConfigAPI.SafeAddInputWithSlider(
-                modName,
-                keyConfig,
-                "跳跃键 (Jump Key)",
-                typeof(string),
-                "Space"
-            );
+            jumpKeyString = ModConfigAPI.SafeLoad<string>(ModName, KeyConfig, "Space");
+            jumpForce = ModConfigAPI.SafeLoad<float>(ModName, ForceConfig, 5f);
+            gravityMultiplier = ModConfigAPI.SafeLoad<float>(ModName, GravityConfig, 1f);
 
-            // 跳跃高度配置
-            ModConfigAPI.SafeAddInputWithSlider(
-                modName,
-                forceConfig,
-                "跳跃高度 (Jump Force)",
-                typeof(float),
-                5f,
-                new Vector2(1f, 20f)
-            );
+            ApplyGravity();
+            Debug.Log($"[JumpMod] 配置加载完成: 跳跃键={jumpKeyString}, 跳跃高度={jumpForce}, 重力倍数={gravityMultiplier}");
         }
 
-        /// <summary>
-        /// 从 ModConfig 读取配置
-        /// </summary>
-        private void LoadConfigFromModConfig()
-        {
-            string keyStr = ModConfigAPI.SafeLoad<string>(modName, keyConfig, "Space");
-            if (!string.IsNullOrEmpty(keyStr) && Enum.TryParse(keyStr, true, out KeyCode key))
-                jumpKey = key;
-
-            jumpForce = ModConfigAPI.SafeLoad<float>(modName, forceConfig, 5f);
-
-            Debug.Log($"[JumpMod] 配置加载完成: 跳跃键={jumpKey}, 跳跃高度={jumpForce}");
-        }
-
-        /// <summary>
-        /// 配置变更回调
-        /// </summary>
         private void OnConfigChanged(string changedKey)
         {
-            if (!changedKey.EndsWith(keyConfig) && !changedKey.EndsWith(forceConfig))
-                return;
-
-            LoadConfigFromModConfig();
-            Debug.Log("[JumpMod] 配置已更新");
+            if (changedKey.EndsWith(KeyConfig) ||
+                changedKey.EndsWith(ForceConfig) ||
+                changedKey.EndsWith(GravityConfig))
+                LoadConfig();
         }
 
         private void Update()
         {
+            // 等待玩家对象
             if (player == null)
             {
                 player = CharacterMainControl.Main;
                 if (player != null)
-                    Debug.Log("[JumpMod] 找到玩家对象！");
+                    Debug.Log("[JumpMod] 找到玩家对象");
             }
             if (player == null) return;
 
+            // 初始化原始重力，只做一次
+            if (!gravityInitialized)
+            {
+                originalGravity = Physics.gravity;
+                gravityInitialized = true;
+                Debug.Log($"[JumpMod] 原始全局重力: {originalGravity}");
+                ApplyGravity();
+            }
+
+            // 找 Movement 组件
             if (movement == null)
             {
                 movement = player.GetComponent<Movement>();
                 if (movement != null)
-                    Debug.Log("[JumpMod] 找到 Movement 组件！");
+                    Debug.Log("[JumpMod] 找到 Movement 组件");
             }
             if (movement == null) return;
 
-            // 检测跳跃按键
-            if (Input.GetKeyDown(jumpKey) && movement.IsOnGround)
+            // 跳跃按键检测 - 支持特殊键
+            if (IsJumpKeyPressed() && movement.IsOnGround && Time.time - lastJumpTime > JumpCooldown)
                 jumpRequested = true;
 
             if (jumpRequested)
@@ -138,36 +120,86 @@ namespace JumpMod
         }
 
         /// <summary>
-        /// 执行跳跃
+        /// 检测跳跃键是否按下（支持特殊键）
         /// </summary>
+        private bool IsJumpKeyPressed()
+        {
+            if (string.IsNullOrEmpty(jumpKeyString))
+                return false;
+
+            // 处理特殊键
+            string key = jumpKeyString.Trim();
+
+            switch (key.ToLower())
+            {
+                case "leftctrl":
+                case "left ctrl":
+                case "lctrl":
+                    return Input.GetKeyDown(KeyCode.LeftControl);
+
+                case "rightctrl":
+                case "right ctrl":
+                case "rctrl":
+                    return Input.GetKeyDown(KeyCode.RightControl);
+
+                case "leftshift":
+                case "left shift":
+                case "lshift":
+                    return Input.GetKeyDown(KeyCode.LeftShift);
+
+                case "rightshift":
+                case "right shift":
+                case "rshift":
+                    return Input.GetKeyDown(KeyCode.RightShift);
+
+                case "leftalt":
+                case "left alt":
+                case "lalt":
+                    return Input.GetKeyDown(KeyCode.LeftAlt);
+
+                case "rightalt":
+                case "right alt":
+                case "ralt":
+                    return Input.GetKeyDown(KeyCode.RightAlt);
+
+                case "ctrl":
+                case "control":
+                    return Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl);
+
+                case "shift":
+                    return Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift);
+
+                case "alt":
+                case "altgr":
+                    return Input.GetKeyDown(KeyCode.LeftAlt) || Input.GetKeyDown(KeyCode.RightAlt);
+
+                default:
+                    // 尝试解析为普通 KeyCode
+                    if (Enum.TryParse(key, true, out KeyCode keyCode))
+                        return Input.GetKeyDown(keyCode);
+                    return false;
+            }
+        }
+
+        private void ApplyGravity()
+        {
+            if (!gravityInitialized) return;
+            Physics.gravity = originalGravity * gravityMultiplier;
+            Debug.Log($"[JumpMod] 已应用全局重力倍数: {Physics.gravity}");
+        }
+
         private void PerformJump()
         {
-            if (movement == null) return;
-
             var cm = movement.GetComponent<CharacterMovement>();
             if (cm == null) return;
 
-            cm.PauseGroundConstraint(0.2f);
-
+            cm.PauseGroundConstraint(0.05f);
             Vector3 vel = cm.velocity;
             vel.y = jumpForce;
             cm.velocity = vel;
 
+            lastJumpTime = Time.time;
             Debug.Log($"[JumpMod] 跳跃成功！高度: {jumpForce}");
-        }
-
-        /// <summary>
-        /// Mod 激活事件处理
-        /// </summary>
-        private void OnModActivated(ModInfo info, Duckov.Modding.ModBehaviour behaviour)
-        {
-            if (info.name == ModConfigAPI.ModConfigName)
-            {
-                Debug.Log("[JumpMod] ModConfig 已激活");
-
-                // 注册配置和事件监听
-                SetupModConfig();
-            }
         }
     }
 }

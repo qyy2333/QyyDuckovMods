@@ -27,6 +27,7 @@ namespace LootboxItemDisplay
         // UI尺寸
         public float PanelMinWidth = 380f;
         public float PanelMaxHeight = 600f;
+        public float highValuePanelOpacity = 0.9f;
 
         // UI文字大小
         public int titleFontSize = 20;
@@ -39,6 +40,7 @@ namespace LootboxItemDisplay
         public int layoutSpacing = 8;
         public bool debugMode = false;
         public bool showHighestValueItem = true;  // 是否显示最高价值物品
+        public bool showItemIcons = true;         //是否显示图标
         public float highValueThreshold = 100f;   // 价值阈值
 
         // 静态常量
@@ -158,6 +160,12 @@ namespace LootboxItemDisplay
                 "showHighestValueItem",
                 isChinese ? "显示最高价值物品" : "show Highest ValueItem",
                 config.showHighestValueItem);
+
+            ModConfigAPI.SafeAddBoolDropdownList(
+                MOD_NAME,
+                "showItemIcons",
+                isChinese ? "显示物品图标" : "show Item Icons",
+                config.showItemIcons);
             // ===== 键位设置 =====
             ModConfigAPI.SafeAddInputWithSlider(
                 MOD_NAME,
@@ -190,6 +198,14 @@ namespace LootboxItemDisplay
                 typeof(float),
                 config.PanelMaxHeight,
                 new Vector2(300, 1500));
+
+            ModConfigAPI.SafeAddInputWithSlider(
+                MOD_NAME,
+                "highValuePanelOpacity",
+                isChinese ? "面板透明度" : "high Value Panel Opacity",
+                typeof(float),
+                config.highValuePanelOpacity,
+                new Vector2(0, 1));
 
             // ===== UI 文字设置 =====
             ModConfigAPI.SafeAddInputWithSlider(
@@ -272,12 +288,14 @@ namespace LootboxItemDisplay
                 config.showLootboxItems = ModConfigAPI.SafeLoad<bool>(MOD_NAME, "showLootboxItems", config.showLootboxItems);
                 config.showPickupItems = ModConfigAPI.SafeLoad<bool>(MOD_NAME, "showPickupItems", config.showPickupItems);
                 config.showHighestValueItem = ModConfigAPI.SafeLoad<bool>(MOD_NAME, "showHighestValueItem", config.showHighestValueItem);
+                config.showItemIcons = ModConfigAPI.SafeLoad<bool>(MOD_NAME, "showItemIcons", config.showItemIcons);
 
                 config.toggleKey = ModConfigAPI.SafeLoad<string>(MOD_NAME, "toggleKey", config.toggleKey);
                 config.highValueToggleKey = ModConfigAPI.SafeLoad<string>(MOD_NAME, "highValueToggleKey", config.highValueToggleKey);
 
                 config.PanelMinWidth = ModConfigAPI.SafeLoad<float>(MOD_NAME, "panelWidth", config.PanelMinWidth);
                 config.PanelMaxHeight = ModConfigAPI.SafeLoad<float>(MOD_NAME, "panelHeight", config.PanelMaxHeight);
+                config.highValuePanelOpacity = ModConfigAPI.SafeLoad<float>(MOD_NAME, "highValuePanelOpacity", config.highValuePanelOpacity);
 
                 config.titleFontSize = ModConfigAPI.SafeLoad<int>(MOD_NAME, "titleFontSize", config.titleFontSize);
                 config.lootboxTitleFontSize = ModConfigAPI.SafeLoad<int>(MOD_NAME, "lootboxTitleFontSize", config.lootboxTitleFontSize);

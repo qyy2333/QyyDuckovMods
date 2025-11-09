@@ -13,12 +13,17 @@ namespace LootboxItemDisplay
         private GameObject panelObject;
         private RectTransform panelRect;
 
+        private Image panelImage; // 新增：保存面板图像引用
+        private Image titleBarImage; // 新增：保存标题栏图像引用
+        private Image[] slotImages = new Image[3]; // 新增：保存槽位图像引用
         private GameObject[] itemSlots = new GameObject[3];
+        private Image[] itemIconImages = new Image[3]; // 新增：物品图标
+        //private GameObject[] itemIconBgs = new GameObject[3]; // 新增：图标背景
         private TextMeshProUGUI[] itemNameTexts = new TextMeshProUGUI[3];
         private TextMeshProUGUI[] valueTexts = new TextMeshProUGUI[3];
         private TextMeshProUGUI[] locationTexts = new TextMeshProUGUI[3];
         private TextMeshProUGUI[] distanceTexts = new TextMeshProUGUI[3];
-        private GameObject[] arrowIndicators = new GameObject[3]; // 方向指示箭头
+        private GameObject[] arrowIndicators = new GameObject[3];
 
         private List<NearbyItemDetector.HighValueItemInfo> currentTopItems = new List<NearbyItemDetector.HighValueItemInfo>();
 
@@ -57,7 +62,7 @@ namespace LootboxItemDisplay
             canvasObj = new GameObject("HighestValueCanvas");
             var canvas = canvasObj.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = LootboxConfig.CanvasSortingOrder + 1;
+            canvas.sortingOrder = LootboxConfig.CanvasSortingOrder; // 修改：使用相同图层
 
             var scaler = canvasObj.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -79,16 +84,12 @@ namespace LootboxItemDisplay
             panelRect.anchoredPosition = new Vector2(-20, -20);
             panelRect.sizeDelta = new Vector2(380, 420);
 
-            var image = panelObject.AddComponent<Image>();
-            image.color = LootboxConfig.PanelBackgroundColor;
+            panelImage = panelObject.AddComponent<Image>();
+            panelImage.color = LootboxConfig.PanelBackgroundColor;
 
             var outline = panelObject.AddComponent<Outline>();
             outline.effectColor = LootboxConfig.PanelOutlineColor;
-            outline.effectDistance = new Vector2(3, -3);
-
-            var shadow = panelObject.AddComponent<Shadow>();
-            shadow.effectColor = LootboxConfig.PanelShadowColor;
-            shadow.effectDistance = new Vector2(5, -5);
+            outline.effectDistance = new Vector2(2, -2);
         }
 
         private void CreateTitleBar()
@@ -102,7 +103,8 @@ namespace LootboxItemDisplay
             titleRect.pivot = new Vector2(0.5f, 1);
             titleRect.sizeDelta = new Vector2(0, 35);
 
-            titleBar.AddComponent<Image>().color = LootboxConfig.TitleBarColor;
+            titleBarImage = titleBar.AddComponent<Image>();
+            titleBarImage.color = LootboxConfig.TitleBarColor;
 
             var titleTextObj = new GameObject("TitleText");
             titleTextObj.transform.SetParent(titleBar.transform, false);
@@ -136,9 +138,10 @@ namespace LootboxItemDisplay
             slotRect.anchoredPosition = new Vector2(0, yOffset);
             slotRect.sizeDelta = new Vector2(-20, 110);
 
-            slotObj.AddComponent<Image>().color = new Color(0.15f, 0.15f, 0.2f, 0.8f);
+            slotImages[index] = slotObj.AddComponent<Image>();
+            slotImages[index].color = new Color(0.15f, 0.15f, 0.2f, 0.6f);
 
-            // 排名 - 左对齐
+            // 排名标签
             var rankText = CreateText(slotObj.transform, "Rank", new Vector2(10, -5), new Vector2(30, 25),
                 $"#{index + 1}", 18, GetRankColor(index), FontStyles.Bold, TextAlignmentOptions.Left);
             var rankRect = rankText.GetComponent<RectTransform>();
@@ -146,20 +149,56 @@ namespace LootboxItemDisplay
             rankRect.anchorMax = new Vector2(0, 1);
             rankRect.pivot = new Vector2(0, 1);
 
-            // 物品名
-            itemNameTexts[index] = CreateText(slotObj.transform, "Name", new Vector2(0, -5),
-                new Vector2(-20, 25), "", 16, Color.white, FontStyles.Bold, TextAlignmentOptions.Center);
+            // 创建物品图标
+            var iconObj = new GameObject("Icon");
+            iconObj.transform.SetParent(slotObj.transform, false);
+
+            var iconRect = iconObj.AddComponent<RectTransform>();
+            iconRect.anchorMin = new Vector2(0, 1);
+            iconRect.anchorMax = new Vector2(0, 1);
+            iconRect.pivot = new Vector2(0, 1);
+            iconRect.anchoredPosition = new Vector2(50, -10);
+            iconRect.sizeDelta = new Vector2(50, 50);
+
+            itemIconImages[index] = iconObj.AddComponent<Image>();
+            itemIconImages[index].color = Color.white;
+
+            // 给图标添加背景
+            // var iconBg = new GameObject("IconBg");
+            // iconBg.transform.SetParent(slotObj.transform, false);
+            // var iconBgRect = iconBg.AddComponent<RectTransform>();
+            // iconBgRect.anchorMin = new Vector2(0, 1);
+            // iconBgRect.anchorMax = new Vector2(0, 1);
+            // iconBgRect.pivot = new Vector2(0, 1);
+            // iconBgRect.anchoredPosition = new Vector2(50, -10);
+            // iconBgRect.sizeDelta = new Vector2(50, 50);
+            // var iconBgImage = iconBg.AddComponent<Image>();
+            // iconBgImage.color = new Color(0.1f, 0.1f, 0.15f, 0.9f);
+            // iconBg.transform.SetAsFirstSibling(); // 放到图标后面
+            // itemIconBgs[index] = iconBg; // 保存背景引用
+
+            // 物品名称（右移以避开图标）
+            itemNameTexts[index] = CreateText(slotObj.transform, "Name", new Vector2(110, -10),
+                new Vector2(-130, 25), "", 15, Color.white, FontStyles.Bold, TextAlignmentOptions.Left);
+            var nameRect = itemNameTexts[index].GetComponent<RectTransform>();
+            nameRect.anchorMin = new Vector2(0, 1);
+            nameRect.anchorMax = new Vector2(1, 1);
+            nameRect.pivot = new Vector2(0, 1);
 
             // 价值
-            valueTexts[index] = CreateText(slotObj.transform, "Value", new Vector2(0, -35),
-                new Vector2(-20, 20), "", 15, LootboxConfig.ItemValueColor, FontStyles.Normal, TextAlignmentOptions.Center);
+            valueTexts[index] = CreateText(slotObj.transform, "Value", new Vector2(110, -35),
+                new Vector2(-130, 20), "", 14, LootboxConfig.ItemValueColor, FontStyles.Normal, TextAlignmentOptions.Left);
+            var valueRect = valueTexts[index].GetComponent<RectTransform>();
+            valueRect.anchorMin = new Vector2(0, 1);
+            valueRect.anchorMax = new Vector2(1, 1);
+            valueRect.pivot = new Vector2(0, 1);
 
             // 位置
-            locationTexts[index] = CreateText(slotObj.transform, "Location", new Vector2(0, -60),
+            locationTexts[index] = CreateText(slotObj.transform, "Location", new Vector2(0, -65),
                 new Vector2(-20, 18), "", 13, LootboxConfig.ItemTextColor, FontStyles.Normal, TextAlignmentOptions.Center);
 
             // 距离
-            distanceTexts[index] = CreateText(slotObj.transform, "Distance", new Vector2(0, -82),
+            distanceTexts[index] = CreateText(slotObj.transform, "Distance", new Vector2(0, -87),
                 new Vector2(-20, 20), "", 14, LootboxConfig.ItemWeightColor, FontStyles.Bold, TextAlignmentOptions.Center);
 
             itemSlots[index] = slotObj;
@@ -177,12 +216,10 @@ namespace LootboxItemDisplay
             arrowRect.pivot = new Vector2(0.5f, 0.5f);
             arrowRect.sizeDelta = new Vector2(40, 40);
 
-            // 创建三角形箭头
             var arrow = arrowObj.AddComponent<Image>();
             arrow.sprite = CreateArrowSprite();
             arrow.color = GetRankColor(index);
 
-            // 添加外发光效果
             var outline = arrowObj.AddComponent<Outline>();
             outline.effectColor = new Color(0, 0, 0, 0.8f);
             outline.effectDistance = new Vector2(2, -2);
@@ -193,7 +230,6 @@ namespace LootboxItemDisplay
 
         private Sprite CreateArrowSprite()
         {
-            // 创建三角形箭头纹理
             Texture2D tex = new Texture2D(64, 64);
             Color[] pixels = new Color[64 * 64];
 
@@ -201,13 +237,11 @@ namespace LootboxItemDisplay
             {
                 for (int x = 0; x < 64; x++)
                 {
-                    // 创建向上的三角形
                     float centerX = 32f;
                     float topY = 50f;
                     float bottomY = 14f;
                     float width = 30f;
 
-                    // 计算点到三角形边的距离
                     bool inTriangle = y >= bottomY && y <= topY &&
                                      x >= centerX - width * (topY - y) / (topY - bottomY) &&
                                      x <= centerX + width * (topY - y) / (topY - bottomY);
@@ -255,31 +289,109 @@ namespace LootboxItemDisplay
 
         public void Update()
         {
+            // 检查是否在主菜单，如果是则隐藏UI
+            if (CharacterMainControl.Main == null && IsVisible)
+            {
+                Hide();
+                return;
+            }
+
             UpdateToggleKey();
             HandleToggle();
             UpdateDragging();
+
+            // 实时检查配置并更新图标显示状态
+            UpdateIconVisibility();
+
+            // 实时更新透明度
+            UpdateOpacity();
 
             if (IsVisible && currentTopItems.Count > 0)
             {
                 var player = CharacterMainControl.Main;
                 if (player != null)
                 {
-                    for (int i = 0; i < currentTopItems.Count && i < 3; i++)
+                    for (int i = 0; i < currentTopItems.Count; i++)
                     {
                         float dist = Vector3.Distance(player.transform.position, currentTopItems[i].Position);
                         distanceTexts[i].text = $"{dist:F1}m";
-
-                        // 更新箭头指示
-                        UpdateArrowIndicator(i, currentTopItems[i].Position, dist);
+                        UpdateArrowIndicator(i, currentTopItems[i].Position);
                     }
                 }
+            }
+            else
+            {
+                HideAllArrows();
             }
 
             if (!LootboxConfigManager.Config.showHighestValueItem && IsVisible)
                 Hide();
         }
 
-        private void UpdateArrowIndicator(int index, Vector3 targetPos, float distance)
+        /// <summary>
+        /// 实时更新UI透明度
+        /// </summary>
+        private void UpdateOpacity()
+        {
+            if (!IsVisible) return;
+
+            float opacity = LootboxConfigManager.Config.highValuePanelOpacity;
+
+            // 更新主面板透明度
+            if (panelImage != null)
+            {
+                Color c = panelImage.color;
+                c.a = opacity;
+                panelImage.color = c;
+            }
+
+            // 更新标题栏透明度
+            if (titleBarImage != null)
+            {
+                Color c = titleBarImage.color;
+                c.a = opacity;
+                titleBarImage.color = c;
+            }
+
+            // 更新所有槽位透明度
+            for (int i = 0; i < slotImages.Length; i++)
+            {
+                if (slotImages[i] != null)
+                {
+                    Color c = slotImages[i].color;
+                    c.a = opacity * 0.8f; // 槽位稍微透明一些
+                    slotImages[i].color = c;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 实时更新图标显示状态
+        /// </summary>
+        private void UpdateIconVisibility()
+        {
+            if (!IsVisible || currentTopItems.Count == 0) return;
+
+            bool showIcons = LootboxConfigManager.Config.showItemIcons;
+
+            for (int i = 0; i < 3; i++)
+            {
+                if (i < currentTopItems.Count)
+                {
+                    // 同步控制图标和背景的显示状态
+                    if (itemIconImages[i] != null)
+                    {
+                        itemIconImages[i].enabled = showIcons && currentTopItems[i].Item.Icon != null;
+                    }
+                    // if (itemIconBgs[i] != null)
+                    // {
+                    //     itemIconBgs[i].SetActive(showIcons && currentTopItems[i].Item.Icon != null);
+                    // }
+                }
+            }
+        }
+
+        private void UpdateArrowIndicator(int index, Vector3 targetPos)
         {
             var player = CharacterMainControl.Main;
             if (player == null || arrowIndicators[index] == null)
@@ -289,51 +401,30 @@ namespace LootboxItemDisplay
             if (camera == null)
                 return;
 
-            // 将目标位置转换为屏幕坐标
             Vector3 screenPos = camera.WorldToScreenPoint(targetPos);
             bool isOnScreen = screenPos.z > 0 && screenPos.x > 0 && screenPos.x < Screen.width &&
                              screenPos.y > 0 && screenPos.y < Screen.height;
 
-            // 如果距离小于5米且在屏幕内，指向目标位置
-            if (distance < 5f && isOnScreen)
+            if (isOnScreen)
             {
                 arrowIndicators[index].SetActive(true);
                 var arrowRect = arrowIndicators[index].GetComponent<RectTransform>();
                 arrowRect.position = screenPos;
 
-                // 计算指向目标的角度
                 Vector3 direction = (targetPos - player.transform.position).normalized;
                 float angle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg - camera.transform.eulerAngles.y;
                 arrowRect.rotation = Quaternion.Euler(0, 0, -angle);
             }
-            // 如果目标不在屏幕内，在屏幕边缘显示箭头
-            else if (!isOnScreen || distance >= 5f)
+            else
             {
                 arrowIndicators[index].SetActive(true);
                 var arrowRect = arrowIndicators[index].GetComponent<RectTransform>();
 
-                // 计算方向
-                Vector3 direction = (targetPos - camera.transform.position).normalized;
-                Vector3 forward = camera.transform.forward;
-                Vector3 right = camera.transform.right;
-
-                float forwardDot = Vector3.Dot(direction, forward);
-                float rightDot = Vector3.Dot(direction, right);
-
-                // 如果目标在背后，翻转方向
-                if (forwardDot < 0)
-                {
-                    rightDot = -rightDot;
-                }
-
-                // 计算屏幕边缘位置
                 Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
                 float margin = 50f;
-                Vector2 arrowPos = screenCenter;
 
                 float angle = Mathf.Atan2(screenPos.y - screenCenter.y, screenPos.x - screenCenter.x);
 
-                // 计算与屏幕边界的交点
                 float maxX = Screen.width / 2f - margin;
                 float maxY = Screen.height / 2f - margin;
 
@@ -341,15 +432,13 @@ namespace LootboxItemDisplay
                 float ty = Mathf.Abs(maxY / Mathf.Sin(angle));
                 float t = Mathf.Min(tx, ty);
 
-                arrowPos.x = screenCenter.x + t * Mathf.Cos(angle);
-                arrowPos.y = screenCenter.y + t * Mathf.Sin(angle);
+                Vector2 arrowPos = new Vector2(
+                    screenCenter.x + t * Mathf.Cos(angle),
+                    screenCenter.y + t * Mathf.Sin(angle)
+                );
 
                 arrowRect.position = arrowPos;
                 arrowRect.rotation = Quaternion.Euler(0, 0, angle * Mathf.Rad2Deg - 90);
-            }
-            else
-            {
-                arrowIndicators[index].SetActive(false);
             }
         }
 
@@ -368,7 +457,6 @@ namespace LootboxItemDisplay
                 return;
             }
 
-            // 检测是否有新的高价值物品（第一名变化）
             bool hasNewTopItem = currentTopItems.Count == 0 ||
                                  topItems.Count == 0 ||
                                  currentTopItems[0].Item != topItems[0].Item;
@@ -390,7 +478,6 @@ namespace LootboxItemDisplay
                 }
             }
 
-            // 如果有新的第一名物品，自动显示并重置手动隐藏标记
             if (hasNewTopItem)
             {
                 isManuallyHidden = false;
@@ -406,6 +493,17 @@ namespace LootboxItemDisplay
         {
             Color qualityColor = ItemQualitySystem.GetQualityColor(info.Item);
             string colorHex = ItemQualitySystem.GetColorHex(qualityColor);
+
+            // 更新物品图标
+            if (itemIconImages[index] != null && info.Item.Icon != null)
+            {
+                itemIconImages[index].sprite = info.Item.Icon;
+                itemIconImages[index].enabled = true;
+            }
+            else if (itemIconImages[index] != null)
+            {
+                itemIconImages[index].enabled = false;
+            }
 
             itemNameTexts[index].text = $"<color=#{colorHex}>{info.Item.DisplayName}</color>";
             valueTexts[index].text = $"${info.Value:F0}";
@@ -431,6 +529,7 @@ namespace LootboxItemDisplay
                 if (IsVisible)
                 {
                     Hide();
+                    HideAllArrows();
                     isManuallyHidden = true;
                 }
                 else if (currentTopItems.Count > 0 && LootboxConfigManager.Config.showHighestValueItem)
@@ -447,15 +546,6 @@ namespace LootboxItemDisplay
             {
                 if (arrowIndicators[i] != null)
                     arrowIndicators[i].SetActive(false);
-            }
-        }
-
-        private void ShowAllArrows()
-        {
-            for (int i = 0; i < arrowIndicators.Length; i++)
-            {
-                if (arrowIndicators[i] != null)
-                    arrowIndicators[i].SetActive(true);
             }
         }
 
@@ -531,7 +621,6 @@ namespace LootboxItemDisplay
         {
             if (panelObject != null)
                 panelObject.SetActive(true);
-            ShowAllArrows();
         }
 
         public void Hide()
